@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffd9ec">
+<title>Magnet Board</title>
+<style>
+  :root{
+    --pad: 12px;
+    --ink: #38304a;
+    --panel: rgba(255,255,255,.86);
+    --shadow: 0 6px 14px rgba(80,60,110,.18);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; overscroll-behavior:none; }
+  body{
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", system-ui, sans-serif;
+    color:var(--ink);
+    background: linear-gradient(160deg,#ffe6f3 0%,#e6f4ff 45%,#e9ffe9 100%);
+    display:flex; flex-direction:column;
+    height:100dvh; width:100vw; overflow:hidden;
+    user-select:none; -webkit-user-select:none;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    padding: calc(var(--safe-t) + 10px) var(--pad) 10px;
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 2px 10px rgba(120,90,150,.15);
+    z-index: 5;
+    display:flex; align-items:center; gap:10px;
+  }
+  .title{ font-size:15px; font-weight:800; letter-spacing:.2px; }
+  .title small{ display:block; font-weight:600; font-size:10px; opacity:.55; letter-spacing:.4px; text-transform:uppercase; }
+  .count-chip{
+    margin-left:auto; display:flex; align-items:center; gap:7px;
+    background: linear-gradient(135deg,#ffd166,#ff8fab);
+    color:#fff; padding:7px 13px; border-radius:999px;
+    font-weight:800; font-size:20px; line-height:1;
+    box-shadow: var(--shadow); min-width:74px; justify-content:center;
+    transition: transform .18s cubic-bezier(.3,1.6,.5,1);
+  }
+  .count-chip.pop{ transform:scale(1.16); }
+  .count-chip span{ font-size:10px; opacity:.9; font-weight:700; text-transform:uppercase; }
+  .cash-chip{
+    background:#fff; border:none; color:#2f9e6f; font-weight:800; font-size:12px;
+    padding:9px 12px; border-radius:999px; box-shadow:var(--shadow);
+  }
+  .cash-chip:disabled{ opacity:.45; }
+
+  /* ---------- Board ---------- */
+  .board-wrap{ flex:1; position:relative; overflow:hidden; padding:8px; }
+  #board{
+    position:relative; height:100%; width:100%; border-radius:20px; overflow:auto;
+    -webkit-overflow-scrolling:touch;
+    border:3px solid rgba(255,255,255,.9);
+    box-shadow: inset 0 2px 10px rgba(110,80,140,.12), var(--shadow);
+    background-color:#fffdf7;
+    background-image:
+      linear-gradient(45deg, rgba(255,183,197,.35) 25%, transparent 25%, transparent 75%, rgba(255,183,197,.35) 75%),
+      linear-gradient(45deg, rgba(160,220,255,.32) 25%, transparent 25%, transparent 75%, rgba(160,220,255,.32) 75%),
+      linear-gradient(0deg, rgba(255,255,255,0) 0, rgba(255,255,255,0) 100%);
+    background-size: 68px 68px, 68px 68px;
+    background-position: 0 0, 34px 34px;
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+    grid-auto-rows: 68px;
+    align-content:start;
+    padding:6px;
+    gap:2px;
+  }
+  .magnet{
+    display:flex; align-items:center; justify-content:center;
+    border:none; background:none; padding:0; cursor:pointer;
+    animation: plop .34s cubic-bezier(.25,1.7,.45,1) both;
+    touch-action: manipulation;
+  }
+  .magnet svg{
+    width:60px; height:60px; display:block;
+    filter: drop-shadow(0 3px 3px rgba(90,60,110,.28));
+  }
+  .magnet.bye{ animation: bye .26s ease-in forwards; }
+  @keyframes plop{ from{ transform:scale(.2) rotate(0deg); opacity:0 } }
+  @keyframes bye{ to{ transform:scale(.1) rotate(35deg); opacity:0 } }
+  .empty{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    font-size:13px; font-weight:700; opacity:.4; pointer-events:none; text-align:center;
+  }
+  .empty .big{ font-size:34px; }
+
+  /* ---------- Controls ---------- */
+  .controls{
+    background:var(--panel); backdrop-filter: blur(12px);
+    padding:10px var(--pad) calc(var(--safe-b) + 10px);
+    box-shadow: 0 -2px 12px rgba(120,90,150,.16);
+    display:flex; flex-direction:column; gap:8px; z-index:5;
+  }
+  .row{ display:flex; gap:8px; align-items:center; }
+  .seg{ display:flex; gap:6px; flex:1; }
+  .seg button{
+    flex:1; border:2px solid transparent; background:#fff; border-radius:14px;
+    padding:5px 0 3px; font-size:10px; font-weight:800; color:var(--ink);
+    box-shadow:0 2px 5px rgba(120,90,150,.14); display:flex; flex-direction:column; align-items:center; gap:1px;
+  }
+  .seg button svg{ width:30px; height:30px; }
+  .seg button[aria-pressed="true"]{ border-color:#ff8fab; background:#fff6fa; transform:translateY(-1px); }
+  .swatches{ display:flex; gap:7px; flex:1; justify-content:space-between; }
+  .sw{ width:29px; height:29px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,.18); padding:0; }
+  .sw[aria-pressed="true"]{ border-color:var(--ink); transform:scale(1.14); }
+  .stepper{ display:flex; align-items:center; gap:0; background:#fff; border-radius:14px; box-shadow:0 2px 5px rgba(120,90,150,.14); overflow:hidden; }
+  .stepper button{ border:none; background:none; font-size:22px; font-weight:800; color:var(--ink); width:40px; height:40px; }
+  .stepper button:disabled{ opacity:.3; }
+  .stepper .val{ min-width:34px; text-align:center; font-weight:800; font-size:17px; }
+  .add{
+    flex:1; border:none; border-radius:16px; height:46px; color:#fff; font-size:15px; font-weight:800;
+    background:linear-gradient(135deg,#7ed957,#2f9e6f); box-shadow:var(--shadow);
+  }
+  .add:active,.seg button:active,.sw:active,.cash-chip:active{ transform:scale(.96); }
+  .lbl{ font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; opacity:.5; }
+
+  /* ---------- Dialog ---------- */
+  dialog{
+    border:none; border-radius:24px; padding:0; width:min(340px, 88vw);
+    box-shadow:0 20px 50px rgba(60,40,90,.35); color:var(--ink); background:#fff;
+  }
+  dialog::backdrop{ background:rgba(60,40,90,.45); backdrop-filter:blur(3px); }
+  .dlg{ padding:18px; text-align:center; }
+  .dlg h2{ margin:0 0 2px; font-size:19px; }
+  .dlg .sub{ font-size:12px; opacity:.6; margin-bottom:14px; }
+  .amount{ font-size:44px; font-weight:900; color:#2f9e6f; line-height:1; }
+  .cost{ font-size:12px; font-weight:700; opacity:.65; margin-top:6px; }
+  .dlg .stepper{ margin:12px auto; width:fit-content; }
+  .dlg .stepper button{ width:54px; height:48px; font-size:26px; }
+  .dlg .stepper .val{ display:none; }
+  .quick{ display:flex; gap:6px; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
+  .quick button{ border:2px solid #e6e0f0; background:#fff; border-radius:12px; padding:7px 11px; font-weight:800; font-size:13px; color:var(--ink); }
+  .dlg-actions{ display:flex; gap:8px; }
+  .dlg-actions button{ flex:1; border:none; border-radius:14px; height:46px; font-size:15px; font-weight:800; }
+  .btn-cancel{ background:#f0ecf6; color:var(--ink); }
+  .btn-ok{ background:linear-gradient(135deg,#7ed957,#2f9e6f); color:#fff; }
+  .btn-ok:disabled{ opacity:.4; }
+  .warn{ font-size:11px; color:#c2506a; font-weight:700; min-height:14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">Magnet Board<small>tap a magnet to remove it</small></div>
+  <button class="cash-chip" id="cashBtn">💵 Cash-in</button>
+  <div class="count-chip" id="countChip"><b id="count">0</b><span>magnets</span></div>
+</header>
+
+<div class="board-wrap">
+  <div id="board" aria-label="Magnet board"></div>
+  <div class="empty" id="empty"><div class="big">🐤🦕🐱</div><div>Board's empty!<br>Add some magnets below.</div></div>
+</div>
+
+<div class="controls">
+  <div class="row">
+    <div class="seg" id="typeSeg">
+      <button data-type="duck" aria-pressed="true"><span class="ico"></span>Duck</button>
+      <button data-type="dino" aria-pressed="false"><span class="ico"></span>Dino</button>
+      <button data-type="kitty" aria-pressed="false"><span class="ico"></span>Kitty</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="swatches" id="swatches"></div>
+  </div>
+  <div class="row">
+    <div class="stepper">
+      <button id="minus" aria-label="fewer">−</button>
+      <div class="val" id="qty">1</div>
+      <button id="plus" aria-label="more">+</button>
+    </div>
+    <button class="add" id="addBtn">Add Magnets</button>
+  </div>
+</div>
+
+<dialog id="cashDlg">
+  <div class="dlg">
+    <h2>Cash-in Magnets</h2>
+    <div class="sub">Exchange rate: 4 magnets = $1</div>
+    <div class="amount" id="dlgAmount">$1</div>
+    <div class="cost" id="dlgCost">costs 4 magnets</div>
+    <div class="stepper">
+      <button id="dMinus">−</button><div class="val"></div><button id="dPlus">+</button>
+    </div>
+    <div class="quick" id="quick"></div>
+    <div class="warn" id="dlgWarn"></div>
+    <div class="dlg-actions">
+      <button class="btn-cancel" id="dlgCancel">Cancel</button>
+      <button class="btn-ok" id="dlgOk">Cash In</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+  const KEY = "cuteMagnetBoard.v1";
+  const RATE = 4; // magnets per dollar
+
+  const COLORS = ["#FFC93C","#FF8FAB","#7ED957","#4CC9F0","#B085F5","#FF9F5B"];
+
+  /* ---------- Sticker art ---------- */
+  function svgFor(type, color){
+    const w = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"';
+    const stroke = '#fff', sw = 6;
+    if(type === "duck"){
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+                <path fill="#fff" d="M 48.968 2.014 C 27.019 2.028 7.786 22.335 11.126 42.634 C 4.052 43.437 -0.187 51.121 3.17 56.988 C 5.282 60.876 9.196 63.773 13.514 65.336 C 6.146 77.895 7.664 95.192 19.725 104.812 C 34.384 117.601 56.107 119.369 75.169 117.231 C 91.759 115.173 109.701 106.581 114.662 90.616 C 117.038 81.316 116.131 71.637 117.866 62.242 C 118.704 53.635 115.715 42.321 105.709 39.682 C 98.72 38.189 94.238 45.208 88.87 47.152 C 93.679 28.587 80.649 7.701 60.529 3.274 C 56.779 2.291 52.856 1.92 48.968 2.014 Z"/>
+                <path fill="${color}" d="M 50.277 8.878 C 32.524 8.878 18.132 22.299 18.132 38.854 C 18.132 41.448 18.493 44.007 19.19 46.477 C 18.801 46.699 18.393 46.922 17.966 47.136 C 13.831 49.22 9.387 49.988 9.387 51.675 C 9.387 56.467 16.125 60.352 24.44 60.352 C 24.909 60.352 25.373 60.339 25.826 60.313 C 19.842 67.313 16.283 75.249 16.283 81.935 C 16.283 98.059 32.665 111.133 62.488 111.133 C 92.311 111.133 108.697 97.715 108.697 81.935 C 108.697 66.155 114.325 55.205 105.971 47.134 C 100.136 43.557 103.05 53.013 73.537 59.542 C 79.239 53.966 82.422 46.556 82.422 38.852 C 82.422 22.297 68.03 8.876 50.277 8.876 Z"/>
+                <path fill="none" stroke="#000" stroke-width="0.893" stroke-linecap="round" stroke-linejoin="round" d="M 66.157 66.845 C 66.157 66.845 77.693 66.183 92.577 58.183 C 92.577 58.183 105.941 74.807 85.566 90.054 C 65.943 104.739 59.051 88.123 59.051 88.123"/>
+                <path fill="#000" d="M 47.519 35.595 C 47.519 38.603 45.17 41.041 42.273 41.041 C 39.376 41.041 37.027 38.603 37.027 35.595 C 37.027 32.587 39.376 30.149 42.273 30.149 C 45.17 30.149 47.519 32.587 47.519 35.595 Z"/>
+                <path fill="#fff" d="M 45.764 34.268 C 45.764 35.241 44.918 36.03 43.875 36.03 C 42.831 36.03 41.985 35.241 41.985 34.268 C 41.985 33.295 42.831 32.506 43.875 32.506 C 44.918 32.506 45.764 33.295 45.764 34.268 Z"/>
+                <path fill="#000" opacity="0.05" d="M 16.723 77.489 C 16.407 79.015 16.246 80.505 16.246 81.937 C 16.246 98.061 32.628 111.135 62.451 111.135 C 92.274 111.135 108.66 97.717 108.66 81.937 C 108.66 81.937 91.854 103.368 63.507 103.368 C 35.161 103.368 19.62 91.384 16.723 77.489 Z"/>
+                <path fill="#1a1a1a" opacity="0.05" d="M 82.531 46.133 C 76.821 50.911 70.113 55.406 62.902 59.288 C 55.693 63.17 48.166 66.34 40.875 68.564 C 41.329 68.697 41.787 68.82 42.248 68.935 C 59.647 73.281 77.53 63.653 82.193 47.429 C 82.316 46.999 82.428 46.567 82.531 46.133 Z"/>
+                <path fill="#f9f9f9" opacity="0.5" d="M 59.132 10.177 C 50.775 8.088 41.872 9.181 34.38 13.215 C 26.888 17.248 21.421 23.892 19.183 31.685 C 19.06 32.115 18.947 32.547 18.844 32.981 C 24.555 28.204 31.263 23.708 38.473 19.826 C 45.684 15.944 53.213 12.775 60.505 10.551 C 60.05 10.417 59.592 10.292 59.132 10.177 Z"/>
+                <path fill="none" stroke="#000" stroke-width="3.57" d="M 50.277 8.878 C 32.524 8.878 18.132 22.299 18.132 38.854 C 18.132 41.448 18.493 44.007 19.19 46.477 C 18.801 46.699 18.393 46.922 17.966 47.136 C 13.831 49.22 9.387 49.988 9.387 51.675 C 9.387 56.467 16.125 60.352 24.44 60.352 C 24.909 60.352 25.373 60.339 25.826 60.313 C 19.842 67.313 16.283 75.249 16.283 81.935 C 16.283 98.059 32.665 111.133 62.488 111.133 C 92.311 111.133 108.697 97.715 108.697 81.935 C 108.697 66.155 114.325 55.205 105.971 47.134 C 100.136 43.557 103.05 53.013 73.537 59.542 C 79.239 53.966 82.422 46.556 82.422 38.852 C 82.422 22.297 68.03 8.876 50.277 8.876 Z"/>
+                <path fill="#f69d05" stroke="#000" stroke-width="0.893" d="M 38.655 51.767 C 38.655 56.559 32.756 60.351 24.441 60.351 C 16.127 60.351 9.386 56.466 9.386 51.674 C 9.386 49.987 13.831 49.221 17.966 47.137 C 22.101 45.054 24.342 42.444 26.866 42.444 C 32.113 42.444 38.655 50.252 38.655 51.767 Z"/>
+                <path fill="${color}" d="M 50.39 43.115 C 50.39 45.205 46.756 46.9 42.273 46.9 C 37.79 46.9 34.156 45.205 34.156 43.115 C 34.156 41.025 37.79 39.331 42.273 39.331 C 46.756 39.331 50.39 41.025 50.39 43.115 Z"/>
+              </svg>`
+
+
+      return `<svg ${w}><g stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">
+        <ellipse cx="48" cy="66" rx="30" ry="24" fill="${color}"/>
+        <path d="M70 78c10 2 16-4 18-12-6 8-12 8-18 4z" fill="${color}"/>
+        <circle cx="60" cy="36" r="20" fill="${color}"/>
+        <path d="M78 34l16 4-16 8z" fill="#F5891F"/>
+      </g>
+      <circle cx="64" cy="32" r="4.2" fill="#3B3350"/>
+      <circle cx="65.6" cy="30.6" r="1.5" fill="#fff"/>
+      <ellipse cx="47" cy="42" rx="5" ry="3.4" fill="#fff" opacity=".55"/></svg>`;
+    }
+    if(type === "dino"){
+      return `<svg ${w}><g stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">
+        <path d="M22 62c-10-4-14-14-8-22 5-7 16-8 22-3l4-8 8 8c14-3 28 6 30 20 2 12-8 22-22 22H34c-8 0-12-6-12-12z" fill="${color}"/>
+        <path d="M18 60c-8 6-12 14-8 22 6-4 10-8 12-14z" fill="${color}"/>
+        <path d="M36 82v10M62 82v10" stroke-linecap="round" stroke="${color}" stroke-width="12"/>
+      </g>
+      <path d="M56 34l6-10 6 10zM70 36l6-9 5 10z" fill="#FFF3B0" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="34" cy="46" r="4.6" fill="#3B3350"/>
+      <circle cx="35.8" cy="44.4" r="1.6" fill="#fff"/>
+      <path d="M24 56c4 3 9 3 13 0" stroke="#3B3350" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+    }
+    //type === kitty
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Cute cat">
+              <path fill="none" stroke="#fff" stroke-width="6.153" stroke-linecap="round" d="M 22.083 57.607 C 16.386 56.468 11.828 57.607 8.41 59.886 M 23.223 65.583 C 18.665 66.723 14.107 69.002 11.828 72.42 M 85.895 57.607 C 91.592 56.468 96.15 57.607 99.569 59.886 M 84.755 65.583 C 89.313 66.723 93.871 69.002 96.15 72.42"/>
+              <path fill="#fff" d="M 82.55 2.026 C 79.288 2.076 76.767 4.364 74.162 6.017 C 69.059 9.419 63.955 12.821 58.852 16.223 C 55.654 15.564 52.322 15.565 49.124 16.223 C 42.494 11.84 35.936 7.341 29.246 3.052 C 25.797 1.138 21.025 1.971 18.625 5.168 C 16.45 7.836 16.073 11.501 16.632 14.794 C 17.261 21.399 17.889 28.005 18.518 34.61 C 13.905 40.79 10.493 48.274 10.698 56.12 C 10.81 61.737 12.3 67.353 15.195 72.182 C 12.311 80.278 11.997 89.568 15.62 97.487 C 17.173 100.82 19.384 103.842 22.077 106.345 C 21.923 110.346 24.367 114.241 27.987 115.926 C 32.289 118.122 37.315 118.254 42.024 117.741 C 43.736 117.552 45.41 117.036 47.019 116.496 C 51.689 116.978 56.41 116.975 61.08 116.482 C 65.716 118.299 70.882 118.318 75.726 117.439 C 79.58 116.66 83.46 114.472 85.063 110.716 C 85.652 109.344 85.922 107.842 85.886 106.351 C 87.285 105.037 88.576 103.602 89.692 102.038 C 96.043 103.191 103.078 101.738 107.873 97.246 C 113.277 92.259 115.484 84.397 114.375 77.232 C 113.436 71.518 109.613 66.177 104.114 64.091 C 101.695 63.122 99.046 62.695 96.449 62.951 C 97.893 56.784 97.488 50.164 95.008 44.311 C 93.612 40.845 91.692 37.605 89.46 34.615 C 90.168 26.976 90.972 19.343 91.587 11.698 C 91.597 7.752 89.269 3.585 85.343 2.398 C 84.442 2.112 83.493 1.997 82.55 2.026 Z M 95.115 85.106 C 96.051 84.819 95.573 85.725 95.397 86.222 C 95.118 86.947 94.797 87.238 94.984 86.252 C 95.074 85.943 94.855 85.213 95.115 85.106 Z"/>
+              <path fill="#ff7f8a" d="M 49.431 62.165 C 48.292 59.886 49.431 58.747 51.71 58.747 L 56.268 58.747 C 58.547 58.747 59.687 59.886 58.547 62.165 L 55.129 65.583 C 53.989 66.723 53.989 66.723 52.85 65.583 Z"/>
+              <path fill="none" stroke="#7a4a30" stroke-width="1.937" stroke-linecap="round" d="M 22.083 57.607 C 16.386 56.468 11.828 57.607 8.41 59.886 M 23.223 65.583 C 18.665 66.723 14.107 69.002 11.828 72.42 M 85.895 57.607 C 91.592 56.468 96.15 57.607 99.569 59.886 M 84.755 65.583 C 89.313 66.723 93.871 69.002 96.15 72.42"/>
+              <path fill="${color}" stroke="#000" d="M 85.423 96.122 C 97.287 100.766 107.546 95.806 109.734 84.623 C 111.484 75.677 106.986 68.992 100.277 67.679 C 94.685 66.585 90.674 69.284 89.799 73.757 C 89.143 77.112 90.942 79.786 94.297 80.442 C 96.533 80.88 97.87 79.98 98.089 78.862 C 100.107 80.418 100.787 82.873 100.131 86.228 C 99.037 91.819 93.908 94.299 86.517 90.531 Z"/>
+              <path fill="${color}" stroke="#000" stroke-width="0.893" d="M 53.989 50.77 C 75.639 50.77 90.453 66.723 90.453 84.955 C 90.453 102.047 75.639 112.303 53.989 112.303 C 32.339 112.303 17.526 102.047 17.526 84.955 C 17.526 66.723 32.339 50.77 53.989 50.77 Z"/>
+              <path fill="#ffe8d6" stroke="#000" stroke-width="0.893" d="M 53.989 71.281 C 67.663 71.281 77.918 80.397 77.918 90.652 C 77.918 100.908 67.663 107.745 53.989 107.745 C 40.315 107.745 30.06 100.908 30.06 90.652 C 30.06 80.397 40.315 71.281 53.989 71.281 Z"/>
+              <path fill="${color}" stroke="#000" stroke-width="0.893" d="M 20.944 12.028 C 20.944 7.47 24.362 5.191 27.781 7.47 L 48.292 21.143 C 51.71 20.004 56.268 20.004 59.687 21.143 L 80.197 7.47 C 83.616 5.191 87.034 7.47 87.034 12.028 L 84.755 35.957 C 89.313 41.654 92.732 48.491 92.732 55.328 C 92.732 74.699 75.639 86.094 53.989 86.094 C 32.339 86.094 15.247 74.699 15.247 55.328 C 15.247 48.491 18.665 41.654 23.223 35.957 Z"/>
+              <path fill="#ff9aa2" stroke="#000" stroke-width="0.893" d="M 25.502 15.446 C 24.362 13.167 26.641 12.028 27.781 13.167 L 40.315 22.283 C 35.757 24.562 32.339 27.98 30.06 32.538 Z"/>
+              <path fill="#ff9aa2" stroke="#000" stroke-width="0.893" d="M 82.476 15.446 C 83.616 13.167 81.337 12.028 80.197 13.167 L 67.663 22.283 C 72.221 24.562 75.639 27.98 77.918 32.538 Z"/>
+              <path fill="none" stroke="#e07d4a" stroke-width="3.57" stroke-linecap="round" d="M 42.594 25.701 C 44.873 30.259 44.873 33.678 43.734 37.096 M 53.989 23.422 C 55.129 27.98 55.129 31.399 53.989 34.817 M 65.384 25.701 C 63.105 30.259 63.105 33.678 64.245 37.096"/>
+              <path fill="#ff9aa2" opacity="0.5" d="M 30.06 57.607 C 34.618 57.607 38.036 59.886 38.036 63.305 C 38.036 66.723 34.618 69.002 30.06 69.002 C 25.502 69.002 22.083 66.723 22.083 63.305 C 22.083 59.886 25.502 57.607 30.06 57.607 Z"/>
+              <path fill="#ff9aa2" opacity="0.5" d="M 77.918 57.607 C 82.476 57.607 85.895 59.886 85.895 63.305 C 85.895 66.723 82.476 69.002 77.918 69.002 C 73.361 69.002 69.942 66.723 69.942 63.305 C 69.942 59.886 73.361 57.607 77.918 57.607 Z"/>
+              <path fill="#2b2b2b" d="M 40.315 43.933 C 43.734 43.933 47.152 47.352 47.152 51.91 C 47.152 56.468 43.734 59.886 40.315 59.886 C 36.897 59.886 33.478 56.468 33.478 51.91 C 33.478 47.352 36.897 43.933 40.315 43.933 Z"/>
+              <path fill="#2b2b2b" d="M 67.663 43.933 C 71.082 43.933 74.5 47.352 74.5 51.91 C 74.5 56.468 71.082 59.886 67.663 59.886 C 64.245 59.886 60.826 56.468 60.826 51.91 C 60.826 47.352 64.245 43.933 67.663 43.933 Z"/>
+              <path fill="#fff" d="M 42.594 46.212 C 44.304 46.212 45.557 47.466 45.557 48.947 C 45.557 50.428 44.304 51.682 42.594 51.682 C 40.885 51.682 39.632 50.428 39.632 48.947 C 39.632 47.466 40.885 46.212 42.594 46.212 Z"/>
+              <path fill="#fff" d="M 69.942 46.212 C 71.651 46.212 72.905 47.466 72.905 48.947 C 72.905 50.428 71.651 51.682 69.942 51.682 C 68.233 51.682 66.979 50.428 66.979 48.947 C 66.979 47.466 68.233 46.212 69.942 46.212 Z"/>
+              <path fill="#ff7f8a" stroke="#000" stroke-width="0.893" d="M 49.431 62.165 C 48.292 59.886 49.431 58.747 51.71 58.747 L 56.268 58.747 C 58.547 58.747 59.687 59.886 58.547 62.165 L 55.129 65.583 C 53.989 66.723 53.989 66.723 52.85 65.583 Z"/>
+              <path fill="none" stroke="#7a4a30" stroke-width="2.165" stroke-linecap="round" d="M 53.989 66.723 C 53.989 71.281 49.431 72.42 47.152 70.141 M 53.989 66.723 C 53.989 71.281 58.547 72.42 60.826 70.141"/>
+              <path fill="none" stroke="#000" stroke-width="4.068" stroke-linejoin="round" d="M 25.271 6.579 C 22.867 6.472 20.944 8.609 20.944 12.028 L 23.223 35.957 C 18.665 41.654 15.247 48.491 15.247 55.328 C 15.247 61.664 17.076 67.145 20.294 71.655 C 18.493 75.787 17.526 80.297 17.526 84.955 C 17.526 93.202 20.974 99.856 26.975 104.535 C 26.756 105.19 26.641 105.884 26.641 106.605 C 26.641 111.163 31.199 113.442 38.036 113.442 C 41.366 113.442 44.156 112.901 46.142 111.82 C 48.639 112.139 51.259 112.303 53.989 112.303 C 56.719 112.303 59.34 112.139 61.837 111.82 C 63.822 112.901 66.612 113.442 69.942 113.442 C 76.779 113.442 81.337 111.163 81.337 106.605 C 81.337 105.884 81.222 105.19 81.003 104.535 C 83.762 102.384 85.982 99.816 87.575 96.866 C 98.509 100.138 107.679 95.124 109.733 84.623 C 111.483 75.677 106.986 68.99 100.276 67.678 C 94.685 66.584 90.674 69.283 89.799 73.756 C 89.142 77.111 90.942 79.785 94.296 80.441 C 96.533 80.879 97.87 79.98 98.089 78.861 C 100.107 80.417 100.788 82.873 100.132 86.228 C 99.197 91.008 95.312 93.515 89.587 91.787 C 90.157 89.653 90.453 87.372 90.453 84.955 C 90.453 80.297 89.485 75.787 87.684 71.655 C 90.902 67.145 92.732 61.664 92.732 55.328 C 92.732 48.491 89.313 41.654 84.755 35.957 L 87.034 12.028 C 87.034 7.47 83.616 5.191 80.197 7.47 L 59.687 21.143 C 56.268 20.004 51.71 20.004 48.292 21.143 L 27.781 7.47 C 26.926 6.9 26.072 6.615 25.271 6.579 Z"/>
+              <path fill="#ffe8d6" stroke="#000" stroke-width="0.893" d="M 38.036 98.629 C 44.873 98.629 49.431 102.047 49.431 106.605 C 49.431 111.163 44.873 113.442 38.036 113.442 C 31.199 113.442 26.641 111.163 26.641 106.605 C 26.641 102.047 31.199 98.629 38.036 98.629 Z"/>
+              <path fill="#ffe8d6" stroke="#000" stroke-width="0.893" d="M 69.942 98.629 C 76.779 98.629 81.337 102.047 81.337 106.605 C 81.337 111.163 76.779 113.442 69.942 113.442 C 63.105 113.442 58.547 111.163 58.547 106.605 C 58.547 102.047 63.105 98.629 69.942 98.629 Z"/>
+              <path fill="none" stroke="#7a4a30" stroke-width="1.937" stroke-linecap="round" d="M 22.083 57.607 C 16.386 56.468 11.828 57.607 8.41 59.886 M 23.223 65.583 C 18.665 66.723 14.107 69.002 11.828 72.42 M 85.895 57.607 C 91.592 56.468 96.15 57.607 99.569 59.886 M 84.755 65.583 C 89.313 66.723 93.871 69.002 96.15 72.42"/>
+              <path fill="#fff" d="M 93.11 83.595 L 96.867 83.595 L 96.867 88.187 L 93.11 88.187 Z"/>
+            </svg>`;
+  }
+
+  /* ---------- State ---------- */
+  let magnets = load();
+  let type = "duck";
+  let color = COLORS[0];
+  let qty = 1;
+
+  function load(){
+    try{
+      const raw = JSON.parse(localStorage.getItem(KEY));
+      if(Array.isArray(raw)) return raw.filter(m => m && m.type && m.color);
+    }catch(e){}
+    return [];
+  }
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(magnets)); }catch(e){}
+  }
+
+  /* ---------- DOM ---------- */
+  const board = document.getElementById("board");
+  const empty = document.getElementById("empty");
+  const countEl = document.getElementById("count");
+  const chip = document.getElementById("countChip");
+  const cashBtn = document.getElementById("cashBtn");
+  const qtyEl = document.getElementById("qty");
+  const dlg = document.getElementById("cashDlg");
+
+  function makeEl(m){
+    const b = document.createElement("button");
+    b.className = "magnet";
+    b.dataset.id = m.id;
+    b.style.transform = "rotate(" + m.rot + "deg)";
+    b.setAttribute("aria-label", "Remove " + m.type + " magnet");
+    b.innerHTML = svgFor(m.type, m.color);
+    return b;
+  }
+
+  function render(){
+    board.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    magnets.forEach(m => frag.appendChild(makeEl(m)));
+    board.appendChild(frag);
+    updateCount();
+  }
+
+  function updateCount(){
+    countEl.textContent = magnets.length;
+    cashBtn.disabled = magnets.length < RATE;
+    empty.style.display = magnets.length ? "none" : "flex";
+    chip.classList.add("pop");
+    setTimeout(() => chip.classList.remove("pop"), 180);
+  }
+
+  function addMagnets(n){
+    for(let i=0;i<n;i++){
+      const m = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+        type, color,
+        rot: Math.round((Math.random()*30 - 15) * 10) / 10
+      };
+      magnets.push(m);
+      const el = makeEl(m);
+      el.style.animationDelay = (i * 40) + "ms";
+      board.appendChild(el);
+    }
+    save(); updateCount();
+    board.scrollTop = board.scrollHeight;
+  }
+
+  function removeById(id, el){
+    const i = magnets.findIndex(m => m.id === id);
+    if(i < 0) return;
+    magnets.splice(i,1); save();
+    el.classList.add("bye");
+    setTimeout(() => { el.remove(); }, 250);
+    updateCount();
+  }
+
+  board.addEventListener("click", e => {
+    const el = e.target.closest(".magnet");
+    if(el && !el.classList.contains("bye")) removeById(el.dataset.id, el);
+  });
+
+  /* ---------- Controls ---------- */
+  document.querySelectorAll("#typeSeg button").forEach(btn => {
+    btn.querySelector(".ico").innerHTML = svgFor(btn.dataset.type, "#FFC93C");
+    btn.addEventListener("click", () => {
+      type = btn.dataset.type;
+      document.querySelectorAll("#typeSeg button").forEach(b =>
+        b.setAttribute("aria-pressed", String(b === btn)));
+      refreshIcons();
+    });
+  });
+
+  const swWrap = document.getElementById("swatches");
+  COLORS.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "sw"; b.style.background = c;
+    b.setAttribute("aria-pressed", String(i === 0));
+    b.setAttribute("aria-label", "color " + c);
+    b.addEventListener("click", () => {
+      color = c;
+      swWrap.querySelectorAll(".sw").forEach(s => s.setAttribute("aria-pressed", String(s === b)));
+      refreshIcons();
+    });
+    swWrap.appendChild(b);
+  });
+
+  function refreshIcons(){
+    document.querySelectorAll("#typeSeg button").forEach(btn => {
+      btn.querySelector(".ico").innerHTML = svgFor(btn.dataset.type, color);
+    });
+  }
+
+  function setQty(n){
+    qty = Math.min(25, Math.max(1, n));
+    qtyEl.textContent = qty;
+    document.getElementById("minus").disabled = qty <= 1;
+    document.getElementById("plus").disabled = qty >= 25;
+  }
+  document.getElementById("minus").addEventListener("click", () => setQty(qty-1));
+  document.getElementById("plus").addEventListener("click", () => setQty(qty+1));
+  document.getElementById("addBtn").addEventListener("click", () => addMagnets(qty));
+
+  /* ---------- Cash-in ---------- */
+  let dollars = 1;
+  const dAmount = document.getElementById("dlgAmount");
+  const dCost = document.getElementById("dlgCost");
+  const dWarn = document.getElementById("dlgWarn");
+  const dOk = document.getElementById("dlgOk");
+  const quick = document.getElementById("quick");
+
+  [1,2,5,10].forEach(v => {
+    const b = document.createElement("button");
+    b.textContent = "$" + v;
+    b.addEventListener("click", () => setDollars(v));
+    quick.appendChild(b);
+  });
+
+  function maxDollars(){ return Math.floor(magnets.length / RATE); }
+
+  function setDollars(v){
+    const max = Math.max(1, maxDollars());
+    dollars = Math.min(max, Math.max(1, v));
+    dAmount.textContent = "$" + dollars;
+    const cost = dollars * RATE;
+    dCost.textContent = "costs " + cost + " magnets";
+    const ok = cost <= magnets.length;
+    dOk.disabled = !ok;
+    dWarn.textContent = ok ? "" : "Not enough magnets yet!";
+    document.getElementById("dMinus").disabled = dollars <= 1;
+    document.getElementById("dPlus").disabled = dollars >= max;
+  }
+  document.getElementById("dMinus").addEventListener("click", () => setDollars(dollars-1));
+  document.getElementById("dPlus").addEventListener("click", () => setDollars(dollars+1));
+  document.getElementById("dlgCancel").addEventListener("click", () => dlg.close());
+
+  dOk.addEventListener("click", () => {
+    const cost = dollars * RATE;
+    if(cost > magnets.length) return;
+    magnets.splice(magnets.length - cost, cost);
+    save(); render();
+    dlg.close();
+    setTimeout(() => alert("🎉 Cashed in " + cost + " magnets for $" + dollars + "!"), 120);
+  });
+
+  cashBtn.addEventListener("click", () => {
+    setDollars(Math.min(dollars, Math.max(1, maxDollars())));
+    if(typeof dlg.showModal === "function") dlg.showModal();
+  });
+
+  /* ---------- Init ---------- */
+  refreshIcons();
+  setQty(1);
+  render();
+
+  // keep double-tap from zooming on iOS
+  let lastTouch = 0;
+  document.addEventListener("touchend", e => {
+    const now = Date.now();
+    if(now - lastTouch < 320) e.preventDefault();
+    lastTouch = now;
+  }, {passive:false});
+})();
+</script>
+</body>
+</html>
